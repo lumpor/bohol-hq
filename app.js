@@ -164,6 +164,24 @@ async function refresh() {
 /* ---------- cards ---------- */
 const inPeriod = d => UI.period === 'all' || monthOf(d) === UI.period;
 const fact = (label, value, cls = '') => `<div><small>${label}</small><b class="${cls}">${value}</b></div>`;
+const fmtDay = s => parseDate(s).toLocaleDateString('en-PH', { weekday: 'short', day: 'numeric', month: 'short' });
+
+// Transactions as rows { date, order, what, detail, amount (+ in, − out) }, newest first.
+function txLog(rows) {
+  if (!rows.length) return '';
+  rows.sort((a, b) => b.date.localeCompare(a.date) || (b.order || 0) - (a.order || 0));
+  let html = '', day = null;
+  for (const r of rows) {
+    if (r.date !== day) {
+      if (day) html += '</div>';
+      day = r.date;
+      html += `<div class="day">${fmtDay(r.date)}</div><div class="list">`;
+    }
+    html += `<div class="item"><div class="item-main"><b>${r.what}</b>${r.detail ? `<small>${r.detail}</small>` : ''}</div>
+      <span class="amt ${r.amount > 0 ? 'ok' : ''}">${r.amount > 0 ? '+' : '−'}${peso(Math.abs(r.amount))}</span></div>`;
+  }
+  return `<details><summary>Transactions (${rows.length})</summary>${html}</div></details>`;
+}
 
 function hmCard(u) {
   const toMap = list => new Map((list || []).map(o => [o.id, o]));
@@ -199,6 +217,17 @@ function hmCard(u) {
     ${active.length ? `<details><summary>Active loans (${active.length})</summary><div class="list">
       ${active.map(x => `<div class="item"><div class="item-main"><b>${esc(bName(x.l))}</b>
         <small>${peso(x.l.principal)} · ${TYPE[x.l.type]} · ${x.l.frequency}</small></div><span class="amt">${peso(x.st.remaining)} left</span></div>`).join('')}</div></details>` : ''}
+    ${txLog([
+      ...pays.map(p => {
+        const l = S.loans.get(p.loanId);
+        return { date: p.date, order: p.createdAt, what: esc(l ? bName(l) : '?'), amount: p.amount,
+          detail: p.kind === 'principal' ? 'Loan paid back' : l?.type === 'interest' ? 'Interest payment' : 'Loan payment' };
+      }),
+      ...lent.map(l => ({ date: l.startDate, order: l.createdAt, what: esc(bName(l)), amount: -l.principal,
+        detail: `New loan · ${TYPE[l.type]}${l.type === 'term' ? `, pays back ${peso(l.total)}` : ''}` })),
+      ...[...S.rent.values()].filter(r => inPeriod(r.paidOn)).map(r => ({ date: r.paidOn, order: 0, amount: r.amount,
+        what: esc(S.tenants.get(r.tenantId)?.name || '?'), detail: `Rent for ${fmtMonth(r.month)}` })),
+    ])}
   </div>`;
 }
 
@@ -234,6 +263,11 @@ function baboyCard(u) {
       ${fact('Bought sizes', sizes('buy') || '—')}
     </div>
     ${others.length ? `<p><small>Other: ${others.map(e => `${esc(e.what)} ${peso(e.total)}`).join(', ')}</small></p>` : ''}</div></details>
+    ${txLog(list.map(e => ({
+      date: e.date, order: e.createdAt, amount: e.kind === 'sell' ? e.total : -e.total,
+      what: { buy: 'Bought baboy', sell: 'Sold baboy', feed: 'Bought feed', gas: 'Gasolina', other: esc(e.what) }[e.kind],
+      detail: [e.count ? `${e.count} ${SIZES[e.size] || ''}` : '', e.kind === 'feed' ? `${e.kilos} kg` : '', esc(e.notes || '')].filter(Boolean).join(' · '),
+    })))}
   </div>`;
 }
 

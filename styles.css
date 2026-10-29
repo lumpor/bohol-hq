@@ -168,3 +168,4 @@ body { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 .card details .list { box-shadow: none; border: 1px solid var(--line); }
 #top .logo { width: 34px; height: 34px; border-radius: 9px; margin-right: 8px; }
 .facts b small { display: inline; font-size: 13px; text-transform: none; letter-spacing: 0; }
+.day { font-size: 13px; color: var(--muted); font-weight: 600; margin: 12px 4px 6px; }
