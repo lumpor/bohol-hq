@@ -167,7 +167,7 @@ const fact = (label, value, cls = '') => `<div><small>${label}</small><b class="
 const fmtDay = s => parseDate(s).toLocaleDateString('en-PH', { weekday: 'short', day: 'numeric', month: 'short' });
 
 // Transactions as rows { date, order, what, detail, amount (+ in, − out) }, newest first.
-function txLog(rows) {
+function txLog(rows, title = 'Transactions') {
   if (!rows.length) return '';
   rows.sort((a, b) => b.date.localeCompare(a.date) || (b.order || 0) - (a.order || 0));
   let html = '', day = null;
@@ -178,9 +178,9 @@ function txLog(rows) {
       html += `<div class="day">${fmtDay(r.date)}</div><div class="list">`;
     }
     html += `<div class="item"><div class="item-main"><b>${r.what}</b>${r.detail ? `<small>${r.detail}</small>` : ''}</div>
-      <span class="amt ${r.amount > 0 ? 'ok' : ''}">${r.amount > 0 ? '+' : '−'}${peso(Math.abs(r.amount))}</span></div>`;
+      ${r.amount ? `<span class="amt ${r.amount > 0 ? 'ok' : ''}">${r.amount > 0 ? '+' : '−'}${peso(Math.abs(r.amount))}</span>` : ''}</div>`;
   }
-  return `<details><summary>Transactions (${rows.length})</summary>${html}</div></details>`;
+  return `<details><summary>${title} (${rows.length})</summary>${html}</div></details>`;
 }
 
 function hmCard(u) {
@@ -214,20 +214,27 @@ function hmCard(u) {
         <small>${x.st.missed} missed · last paid ${x.st.lastPayment || 'never'}</small></div><span class="amt bad">${peso(x.st.behind)}</span></div>`).join('')}</div></details>` : ''}
     ${unpaid.length ? `<details><summary>Rent not paid (${unpaid.length})</summary><div class="list">
       ${unpaid.map(t => `<div class="item"><div class="item-main"><b>${esc(t.name)}</b><small>pay day ${t.payDay}</small></div><span class="amt">${peso(t.rent)}</span></div>`).join('')}</div></details>` : ''}
-    ${active.length ? `<details><summary>Active loans (${active.length})</summary><div class="list">
-      ${active.map(x => `<div class="item"><div class="item-main"><b>${esc(bName(x.l))}</b>
-        <small>${peso(x.l.principal)} · ${TYPE[x.l.type]} · ${x.l.frequency}</small></div><span class="amt">${peso(x.st.remaining)} left</span></div>`).join('')}</div></details>` : ''}
+    ${active.length ? `<details open><summary>Current loans (${active.length})</summary><div class="list">
+      ${active.sort((a, b) => bName(a.l).localeCompare(bName(b.l))).map(({ l, st }) => `<div class="item"><div class="item-main"><b>${esc(bName(l))}</b>
+        <small>${peso(l.principal)} lent ${fmtDay(l.startDate)} · ${TYPE[l.type]}, ${peso(st.inst)} ${l.frequency === 'weekly' ? 'a week' : 'a day'}</small>
+        <small>${l.type === 'term' ? `${peso(st.paidRegular)} of ${peso(l.total)} paid · ends ${fmtDay(l.endDate)}` : `${peso(st.interestEarned)} interest paid so far`}</small>
+        ${st.behind > 0 ? `<small class="bad">Behind ${peso(st.behind)} (${st.missed} missed)</small>` : ''}</div>
+        <span class="amt">${peso(st.remaining)}<br><small class="muted">${l.type === 'term' ? 'to pay' : 'owed'}</small></span></div>`).join('')}</div></details>` : ''}
     ${txLog([
-      ...pays.map(p => {
+      ...[...S.loans.values()].filter(l => inPeriod(l.startDate)).map(l => ({ date: l.startDate, order: l.createdAt, what: esc(bName(l)),
+        amount: -l.principal, detail: `New loan · ${TYPE[l.type]}${l.type === 'term' ? `, pays back ${peso(l.total)}` : ''}` })),
+      // part of an interest-only loan paid back
+      ...[...S.payments.values()].filter(p => p.kind === 'principal' && inPeriod(p.date)).map(p => {
         const l = S.loans.get(p.loanId);
-        return { date: p.date, order: p.createdAt, what: esc(l ? bName(l) : '?'), amount: p.amount,
-          detail: p.kind === 'principal' ? 'Loan paid back' : l?.type === 'interest' ? 'Interest payment' : 'Loan payment' };
+        return { date: p.date, order: p.createdAt, what: esc(l ? bName(l) : '?'), amount: p.amount, detail: 'Paid back part of the loan' };
       }),
-      ...lent.map(l => ({ date: l.startDate, order: l.createdAt, what: esc(bName(l)), amount: -l.principal,
-        detail: `New loan · ${TYPE[l.type]}${l.type === 'term' ? `, pays back ${peso(l.total)}` : ''}` })),
-      ...[...S.rent.values()].filter(r => inPeriod(r.paidOn)).map(r => ({ date: r.paidOn, order: 0, amount: r.amount,
-        what: esc(S.tenants.get(r.tenantId)?.name || '?'), detail: `Rent for ${fmtMonth(r.month)}` })),
-    ])}
+      ...[...S.loans.values()].filter(l => l.closed && l.closedOn && inPeriod(l.closedOn)).map(l => ({ date: l.closedOn, order: 1e15, what: esc(bName(l)),
+        detail: l.autoClosed ? `Loan of ${peso(l.principal)} fully paid back` : `Loan of ${peso(l.principal)} closed` })),
+      ...[...S.tenants.values()].filter(t => inPeriod(t.startDate)).map(t => ({ date: t.startDate, order: 0, what: esc(t.name),
+        detail: `New boarder · ${peso(t.rent)} a month` })),
+      ...[...S.tenants.values()].filter(t => t.endDate && inPeriod(t.endDate)).map(t => ({ date: t.endDate, order: 0, what: esc(t.name),
+        detail: t.endDate > today() ? 'Moves out' : 'Moved out' })),
+    ], 'Loans and boarders')}
   </div>`;
 }
 

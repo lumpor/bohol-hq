@@ -169,3 +169,5 @@ body { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 #top .logo { width: 34px; height: 34px; border-radius: 9px; margin-right: 8px; }
 .facts b small { display: inline; font-size: 13px; text-transform: none; letter-spacing: 0; }
 .day { font-size: 13px; color: var(--muted); font-weight: 600; margin: 12px 4px 6px; }
+.item-main small + small { margin-top: 1px; }
+.amt small { font-weight: 400; font-size: 12px; }
