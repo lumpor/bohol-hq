@@ -171,3 +171,11 @@ body { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); }
 .day { font-size: 13px; color: var(--muted); font-weight: 600; margin: 12px 4px 6px; }
 .item-main small + small { margin-top: 1px; }
 .amt small { font-weight: 400; font-size: 12px; }
+
+#updateBar {
+  position: fixed; left: 16px; right: 16px; z-index: 40; max-width: 480px; margin: 0 auto;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px);
+  padding: 14px 16px; border: 0; border-radius: 12px; background: var(--brand); color: #fff;
+  font: inherit; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,.25); cursor: pointer;
+}
+#updateBar { bottom: calc(env(safe-area-inset-bottom) + 16px); }

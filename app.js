@@ -1,7 +1,7 @@
 'use strict';
-// Bohol HQ: read-only status of Horny Mafia and King of Baboy, read from the Google Sheet.
+// Bohol Watch Tower: read-only status of Horny Mafia and King of Baboy, read from the Google Sheet.
 // It never writes anything; the sheet only lets its secret code read.
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxirHkuj8XboiE062f8bNiOBo4W332M0Oje0RjVP6KSqI5r2fcltbeGKYdzxeX91smNbA/exec'; // the same Apps Script web app URL (…/exec) the two apps use
 
 /* ---------- small helpers ---------- */
@@ -148,7 +148,7 @@ async function refresh() {
     const r = await fetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ action: 'pullAll', key }) });
     const j = await r.json();
     if (!j.ok) {
-      if (j.error === 'wrong secret code') { key = ''; ls.set('hqKey', ''); throw new Error('Wrong code. Try again.'); }
+      if (j.error === 'wrong secret code') { key = ''; ls.set('hqKey', ''); throw new Error('Wrong password. Try again.'); }
       throw new Error(j.error || 'Could not read the sheet');
     }
     cache = { at: new Date().toISOString(), users: j.users };
@@ -168,7 +168,6 @@ const fmtDay = s => parseDate(s).toLocaleDateString('en-PH', { weekday: 'short',
 
 // Transactions as rows { date, order, what, detail, amount (+ in, − out) }, newest first.
 function txLog(rows, title = 'Transactions') {
-  if (!rows.length) return '';
   rows.sort((a, b) => b.date.localeCompare(a.date) || (b.order || 0) - (a.order || 0));
   let html = '', day = null;
   for (const r of rows) {
@@ -180,7 +179,7 @@ function txLog(rows, title = 'Transactions') {
     html += `<div class="item"><div class="item-main"><b>${r.what}</b>${r.detail ? `<small>${r.detail}</small>` : ''}</div>
       ${r.amount ? `<span class="amt ${r.amount > 0 ? 'ok' : ''}">${r.amount > 0 ? '+' : '−'}${peso(Math.abs(r.amount))}</span>` : ''}</div>`;
   }
-  return `<details><summary>${title} (${rows.length})</summary>${html}</div></details>`;
+  return `<details><summary>${title} (${rows.length})</summary>${rows.length ? html + '</div>' : '<p class="muted"><small>Nothing in this period.</small></p>'}</details>`;
 }
 
 function hmCard(u) {
@@ -214,6 +213,7 @@ function hmCard(u) {
         <small>${x.st.missed} missed · last paid ${x.st.lastPayment || 'never'}</small></div><span class="amt bad">${peso(x.st.behind)}</span></div>`).join('')}</div></details>` : ''}
     ${unpaid.length ? `<details><summary>Rent not paid (${unpaid.length})</summary><div class="list">
       ${unpaid.map(t => `<div class="item"><div class="item-main"><b>${esc(t.name)}</b><small>pay day ${t.payDay}</small></div><span class="amt">${peso(t.rent)}</span></div>`).join('')}</div></details>` : ''}
+    ${!active.length ? '<details open><summary>Current loans (0)</summary><p class="muted"><small>No current loans.</small></p></details>' : ''}
     ${active.length ? `<details open><summary>Current loans (${active.length})</summary><div class="list">
       ${active.sort((a, b) => bName(a.l).localeCompare(bName(b.l))).map(({ l, st }) => `<div class="item"><div class="item-main"><b>${esc(bName(l))}</b>
         <small>${peso(l.principal)} lent ${fmtDay(l.startDate)} · ${TYPE[l.type]}, ${peso(st.inst)} ${l.frequency === 'weekly' ? 'a week' : 'a day'}</small>
@@ -283,8 +283,8 @@ function render() {
   const view = $('#view');
   if (!key) {
     view.innerHTML = `<form class="card" data-form="connect"><b>Connect to the sheet</b>
-      <p><small>Enter the Bohol HQ code. You only do this once.</small></p>
-      <label class="field"><input name="code" type="password" autocomplete="current-password" autocapitalize="none" placeholder="Code" required></label>
+      <p><small>Enter the Watch Tower password. You only do this once.</small></p>
+      <label class="field"><input name="code" type="password" autocomplete="current-password" autocapitalize="none" placeholder="Password" required></label>
       <button class="btn block" type="submit" ${UI.loading ? 'disabled' : ''}>${UI.loading ? 'Connecting…' : 'Connect'}</button>
       ${UI.error ? `<p class="bad"><small>${esc(UI.error)}</small></p>` : ''}</form>`;
     return;
@@ -309,7 +309,8 @@ function render() {
     <p class="muted" style="margin:0 4px 8px"><small>Updated ${updated}${UI.error ? ` · <span class="bad">${esc(UI.error)}</span>` : ''}</small></p>
     ${section('horny-mafia', 'Horny Mafia', hmCard)}
     ${section('king-of-baboy', 'King of Baboy', baboyCard)}
-    ${users.length ? '' : `<div class="card"><small>${UI.loading ? 'Loading…' : 'No data yet.'}</small></div>`}`;
+    ${users.length ? '' : `<div class="card"><small>${UI.loading ? 'Loading…' : 'No data yet.'}</small></div>`}
+    <p class="muted" style="text-align:center"><small>Version ${VERSION}</small></p>`;
 }
 
 const ACT = {
@@ -342,6 +343,17 @@ function handleSetupLink() {
 window.addEventListener('hashchange', () => { handleSetupLink(); refresh(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 window.addEventListener('online', () => refresh());
+
+// Offer the newer version as soon as the service worker has downloaded it.
+function showUpdateBar() {
+  if (document.getElementById('updateBar')) return;
+  const b = document.createElement('button');
+  b.id = 'updateBar';
+  b.textContent = 'New version available — tap to update';
+  b.addEventListener('click', () => location.reload());
+  document.body.appendChild(b);
+}
+navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type === 'update-ready') showUpdateBar(); });
 
 handleSetupLink();
 render();
