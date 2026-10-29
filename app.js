@@ -2,7 +2,7 @@
 // Bohol HQ: read-only status of Horny Mafia and King of Baboy, read from the Google Sheet.
 // It never writes anything; the sheet only lets its secret code read.
 const VERSION = '1.0.0';
-const SYNC_URL = ''; // the same Apps Script web app URL (…/exec) the two apps use
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxirHkuj8XboiE062f8bNiOBo4W332M0Oje0RjVP6KSqI5r2fcltbeGKYdzxeX91smNbA/exec'; // the same Apps Script web app URL (…/exec) the two apps use
 
 /* ---------- small helpers ---------- */
 const $ = (s, el = document) => el.querySelector(s);
