@@ -142,12 +142,15 @@ let key = ls.get('hqKey') || '';
 let cache = ls.get('hqCache'); // { at, users: [{ app, name, data }] }
 
 async function refresh() {
-  if (!SYNC_URL || !key || UI.loading) return;
+  if (!key || UI.loading) return;
   UI.loading = true; UI.error = null; render();
   try {
     const r = await fetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ action: 'pullAll', key }) });
     const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'Could not read the sheet');
+    if (!j.ok) {
+      if (j.error === 'wrong secret code') { key = ''; ls.set('hqKey', ''); throw new Error('Wrong code. Try again.'); }
+      throw new Error(j.error || 'Could not read the sheet');
+    }
     cache = { at: new Date().toISOString(), users: j.users };
     ls.set('hqCache', cache);
   } catch (err) {
@@ -237,8 +240,12 @@ function baboyCard(u) {
 /* ---------- page ---------- */
 function render() {
   const view = $('#view');
-  if (!SYNC_URL || !key) {
-    view.innerHTML = `<div class="card"><b>Not set up yet.</b><p><small>Open the setup link for this app.</small></p></div>`;
+  if (!key) {
+    view.innerHTML = `<form class="card" data-form="connect"><b>Connect to the sheet</b>
+      <p><small>Enter the Bohol HQ code. You only do this once.</small></p>
+      <label class="field"><input name="code" type="password" autocomplete="current-password" autocapitalize="none" placeholder="Code" required></label>
+      <button class="btn block" type="submit" ${UI.loading ? 'disabled' : ''}>${UI.loading ? 'Connecting…' : 'Connect'}</button>
+      ${UI.error ? `<p class="bad"><small>${esc(UI.error)}</small></p>` : ''}</form>`;
     return;
   }
   const users = cache?.users || [];
@@ -273,6 +280,14 @@ const ACT = {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]');
   if (el && ACT[el.dataset.act]) { e.preventDefault(); ACT[el.dataset.act](); }
+});
+
+document.addEventListener('submit', e => {
+  if (e.target.dataset.form !== 'connect') return;
+  e.preventDefault();
+  key = new FormData(e.target).get('code').trim();
+  ls.set('hqKey', key);
+  refresh();
 });
 
 // A setup link (…/#setup/<secret code>) stores the read-only code in this browser.
