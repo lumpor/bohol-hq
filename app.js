@@ -10,7 +10,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const round2 = n => Math.round(n * 100) / 100;
 const sum = (arr, f = x => x) => arr.reduce((s, x) => s + f(x), 0);
 const peso = n => {
-  n = Math.round(n || 0);
+  n = Math.round((n || 0) / 10) * 10; // nearest ₱10
   return (n < 0 ? '−₱' : '₱') + Math.abs(n).toLocaleString('en-PH');
 };
 const fmtChange = n => (n > 0 ? '+' : n < 0 ? '−' : '±') + Math.abs(n);
